@@ -33,14 +33,14 @@ The installed icon opens that specific app in a full-size frame, with no launche
 
 Safari does not copy IndexedDB, Cache Storage or localStorage into a newly installed web app. [WebKit explanation](https://webkit.org/blog/14787/webkit-features-in-safari-17-2/). AppLauncher therefore prepares installation **before** sending app files:
 
-1. Choose local files, or scan a sender's QR **once** and review its name and icon.
+1. On the laptop, choose **Share an app**, upload files, choose the name/icon/settings, then **Generate QR**. Scan it once with the phone camera; the phone automatically receives the name/icon and opens installation instructions. Local import and the manual receiver remain available.
 2. Click **Add to this device**. AppLauncher prepares that app's unique manifest, name, icon and direct launch URL. Confirm **Install / Add to Home Screen** using the browser/OS control.
 3. Open the new app icon. Its temporary installation ticket reconnects to the original source automatically and fetches the pinned package. A receiver-selected icon is included in this package.
 4. Once the new app says **Offline ready**, the source may close. Later launches open the app directly offline.
 
 There are no setup-file downloads, repeated file selections, or second QR scans. For a local import, the original browser tab is the source; for a shared app, the original sharing device stays the source. Public signaling is used to connect a fresh PWA storage container even when source and destination are on the same device. Files remain peer-to-peer.
 
-The share QR expires after ten minutes. Clicking Add creates a separate installation session valid for one hour, so the QR may expire while the already prepared app finishes setup. Keep the source page open and online through the first installed launch. If the source temporarily disconnects, the PWA retries automatically using the saved ticket. A phone may suspend its own background Safari source tab: briefly return to that source tab to let it resume; no file upload or QR scan is required. AppLauncher cannot force a suspended iOS tab to run in the background. A source on another device avoids that same-device suspension issue.
+The share QR expires after ten minutes. Preparing installation creates a separate installation session valid for one hour, so the QR may expire while the already prepared app finishes setup. Keep the source page open and online through the first installed launch. Idle connections retry up to three times using the saved ticket, then show a clear Retry connection action. A progressing transfer is never restarted by a fixed timer. Both devices show transfer bytes and percentage; cached launches hide the transfer interface entirely. A phone may suspend its own background Safari source tab: briefly return to that source tab to let it resume; no file upload or QR scan is required. AppLauncher cannot force a suspended iOS tab to run in the background. A source on another device avoids that same-device suspension issue.
 
 Pending install metadata is stored separately from runnable app packages. An incomplete install does not overwrite an existing cached package. Expired or closed source sessions cannot provide files; the UI explains that installation must be prepared again at the source.
 
@@ -74,7 +74,7 @@ The runtime prefixes ordinary window `localStorage`, `sessionStorage` and Indexe
 - Public Nostr relays through Trystero handle discovery/signaling. Files travel over an encrypted WebRTC data channel; no file-hosting upload or GitHub write occurs when sharing.
 - Both devices need internet for discovery; same Wi-Fi is preferred. No TURN relay is configured, so some restrictive networks/NAT combinations will fail. Public relay availability varies.
 - Invitations use random 192-bit room and password values. Share QR invitations expire after ten minutes; per-install tickets expire after one hour. Keep links private. Credentials are in the URL fragment; fragments are not sent in HTTP requests.
-- Payloads include a SHA-256 integrity check. Receivers explicitly consent to the app before saving; first-launch auto-receive is pinned to the app/hash in the prepared installation ticket.
+- Payloads include a SHA-256 integrity check. Scanning a share QR opens installation instructions; the user confirms OS installation before first launch; first-launch auto-receive is pinned to the app/hash in the prepared installation ticket.
 - Limits: 250 files / 20 MB of file content per package, plus a bounded icon. Hidden files are excluded. ZIP import is not included. A failed transfer leaves the prior package intact.
 - IndexedDB updates replace the package atomically. Browser storage and native app data survive shell cache updates. Cache cleanup removes only old AppLauncher shell caches in this scope.
 - Browser storage can be cleared/evicted, or lost when an app is removed. Persistent storage is requested when available. Keep source files as backups.

@@ -73,7 +73,7 @@ Apps are trusted code on a shared origin. They are not isolated from malicious p
 
 Every app gets `launch.html?app=<id>` and a separate install manifest. Use the OS/browser install action on that app's install screen. The browser decides whether/how installation is offered; a page cannot install silently.
 
-Safari's installed PWA storage is separate. The receiving browser first obtains only the name, icon and installation metadata. Clicking Add prepares a unique PWA and temporary installation ticket. Open the new icon once while the original source remains open and online: the installed app connects automatically and receives the full package. The receiver's chosen icon travels with that package.
+Safari's installed PWA storage is separate. The receiving browser first obtains only the name, icon and installation metadata. Opening a laptop share QR automatically prepares a unique PWA and temporary installation ticket, with no extra confirmation screen before the OS installation step. Open the new icon once while the original source remains open and online: the installed app connects automatically and receives the full package. The receiver's chosen icon travels with that package.
 
 For locally selected files, the current tab is the source. Public signaling lets the new PWA connect back to it; files are not uploaded to a server. A same-device phone source may be suspended when switching to the installed app. Briefly return to the source tab if necessary; the installed app retries with the existing ticket. No setup file, repeat file selection or second QR scan is part of the flow. A laptop source is preferable for iPhone installation because it can remain active independently.
 
