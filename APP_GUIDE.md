@@ -73,6 +73,10 @@ Apps are trusted code on a shared origin. They are not isolated from malicious p
 
 Every app gets `launch.html?app=<id>` and a separate install manifest. Use the OS/browser install action on that app's install screen. The browser decides whether/how installation is offered; a page cannot install silently.
 
-Safari's installed PWA storage is separate. For a received app, keep the **original laptop sender** open through first installed launch; its temporary invitation transfers the accepted package again without another QR. For a local import, save the `.applauncher` setup file and choose it inside the newly installed PWA. This local route does not use signaling. Both modes provide file/QR recovery if the first setup is interrupted. Once files and shell are cached, the installed icon opens the app directly offline.
+Safari's installed PWA storage is separate. The receiving browser first obtains only the name, icon and installation metadata. Clicking Add prepares a unique PWA and temporary installation ticket. Open the new icon once while the original source remains open and online: the installed app connects automatically and receives the full package. The receiver's chosen icon travels with that package.
 
-The root launcher lists apps stored in the current browser container. It cannot enumerate or synchronize the separate private stores belonging to Safari-installed PWAs. Keep app source and setup files as backups.
+For locally selected files, the current tab is the source. Public signaling lets the new PWA connect back to it; files are not uploaded to a server. A same-device phone source may be suspended when switching to the installed app. Briefly return to the source tab if necessary; the installed app retries with the existing ticket. No setup file, repeat file selection or second QR scan is part of the flow. A laptop source is preferable for iPhone installation because it can remain active independently.
+
+A QR is valid for ten minutes; a prepared installation gets its own one-hour ticket. Once files and shell are cached, the installed icon opens the app directly offline. The browser/OS still requires installation confirmation; pages cannot silently create PWA icons.
+
+The root launcher lists apps stored in the current browser container. It cannot enumerate or synchronize the separate private stores belonging to Safari-installed PWAs. Keep app source files as backups.

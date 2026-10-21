@@ -13,7 +13,8 @@ All paths are based on the deployment directory, not `/`, so project Pages subpa
 - `icons.js`: inert HTML/manifest metadata discovery and local image rasterization.
 - `pairing.js`: expiring credentials, public Nostr discovery, WebRTC actions, per-peer transfer and acknowledgements.
 - `scanner.js`: camera stream, local jsQR decoding, cancellation and track cleanup.
-- `store.js`: atomic IndexedDB package records, scoped by project path.
+- `store.js`: separate package and pending-install stores, scoped by project path; schema v2 upgrades retain existing packages.
+- `install.js`: bounded metadata offers and metadata-only pending install records.
 - `manifest.js`: stable app IDs, direct launch URLs, generated install manifests.
 - `sw.js`: atomic shell caching, package-backed virtual file responses, manifests/icons, range requests and isolation headers.
 - `public/runtime.js`: ordinary window storage namespacing injected before app scripts.
@@ -26,11 +27,13 @@ The QR holds a random room/password and ten-minute expiry in the fragment. Tryst
 
 1. `hello`: sender vs receiver role.
 2. `offer`: app ID, name, entry, bounded file/byte count, normalized PNG icon and digest.
-3. `accept`: selected digest, after user consent or a pinned installed-app bootstrap.
-4. `payload`: chunked bytes of a JSON/base64 package.
-5. `receipt`: digest, after validation and committed IndexedDB save.
+3. `prepare`: the browser accepts installation metadata and optionally selects a replacement icon; it does **not** accept the file payload yet.
+4. `prepared`: source creates a personalized package if the icon changed, a separate one-hour sending room, and a pinned metadata/ticket response. The initial receiver saves only metadata in the `installs` store and displays installation controls.
+5. The new installed PWA joins that prepared room using its start URL ticket. Its `accept` message requests the pinned full package.
+6. `payload`: chunked bytes of the JSON/base64 package, sent only after that installed-app accept.
+7. `receipt`: digest, after validation and committed package save. The source reports completion.
 
-The sender keeps the room open through expiry/cancel, because a separately installed Safari PWA needs a second transfer. Multiple peers can fetch the same accepted package; receipt does not shut the source down. The receiver closes its connection after receipt. Progress and disconnect errors are surfaced. No TURN relay is included.
+The original QR room expires in ten minutes. Its child installation sessions can survive that expiry for up to one hour. Explicitly leaving/cancelling the source closes all its sessions. Prepared rooms do not recursively create more prepared rooms; the source bounds the number of child sessions. The receiver closes its metadata connection after the prepared response. Automatic reconnect reuses the saved installation ticket without requiring another QR.
 
 A digest detects corruption and pins an automatic handoff to the offered package. It does not prove a publisher's identity. Anyone possessing the secret invitation can join its room until expiry, so keep the invitation private.
 
@@ -38,11 +41,15 @@ A digest detects corruption and pins an automatic handoff to the offered package
 
 A generated manifest uses a stable ID (`launch.html?app=id`) and a start URL targeting the same static file, optionally with an accepted hash and fragment-only invitation. The static entry point is important: a new PWA container has no controlling service worker or package database yet and cannot open a purely virtual app URL.
 
-First load registers the shell worker. With an accepted bootstrap invitation, the PWA checks offered app ID/hash, receives the package, saves, then opens `apps/id/entry.html`. After this it removes temporary credentials from the visible URL. Later launches find local files first; an expired bootstrap does not affect them. A visible recovery screen handles absent files, stale invitation, source closure and local setup-file import.
+The receiving browser creates an install manifest as soon as metadata is accepted; the full payload is deferred. Schema v2 keeps pending records in `installs` separately from runnable `apps`, so staging an update does not destroy the prior package. Manifest/icon endpoints can read pending records. Saving the received full package atomically replaces `apps` and deletes its pending install record.
 
-Pure local imports do not join signaling at all. A setup-file download exports the original package including metadata and icon. A fresh Safari PWA can import it without any external transfer. Browsers that share the original storage can run immediately.
+First installed load registers the shell worker, joins the ticket room, checks offered app ID/hash, receives and saves files, then opens `apps/id/entry.html`. After this it removes temporary credentials from the visible URL. Later launches use local files first; expired bootstrap credentials do not affect cached apps. A receiver-selected icon is packaged at the source before it issues the installation ticket, so the installed container also gets the intended icon.
 
-No browser API can force PWA installation, copy Safari IndexedDB into a new web-app container, enumerate another container's apps, or keep a suspended iPhone Safari tab alive. These limits must remain explicit in UX/docs rather than being hidden behind a successful initial transfer.
+Local imports use the same automatic first-launch handoff. The source tab retains its files and hosts a prepared sending room; it changes its visible URL/manifest in place so preparing installation does not navigate away and kill its source connection. No setup-file download or import is required. Browsers already sharing local source storage can run immediately after installation.
+
+The new app retries automatically after source disconnects and on returning to the foreground. A visible Retry connection button reuses the ticket, not a file picker or QR scanner. QR validity is ten minutes; prepared install sessions last one hour.
+
+No browser API can silently install a PWA, open Safari's Add to Home Screen sheet, copy Safari IndexedDB into a new PWA, enumerate another container's apps, or force a suspended iPhone Safari tab to execute. A same-device source may need to be foregrounded briefly; an independent laptop source avoids that constraint. Expired/closed sessions need a new preparation at the source. Do not promise arbitrary delayed setup after the source has disappeared.
 
 ## Native app execution
 
@@ -56,4 +63,4 @@ No security sandbox is claimed. Manifest ID/scope do not make new origins. Prefi
 
 Package files replace in one IndexedDB transaction; saved app data uses native browser stores and is not reset by updates. The shell installs atomically, waits until every shell asset is cached before reporting offline readiness, and deletes only earlier shell caches with the exact AppLauncher scope prefix. Package records live outside shell caches.
 
-Tests exercise real RTCDataChannels across isolated browser contexts, with a deterministic Nostr-compatible WebSocket relay in CI. Live mode tests the public relays. Separate fresh contexts model Safari PWA storage, not just two tabs sharing one database. Offline tests reload direct app URLs with source closed and connectivity disabled, or shut down the local preview server for WebKit. Native fixtures verify module imports, worker responses, streaming WASM, JSON fetch, IndexedDB, CSS, HTML navigation and isolation. OS-level install UI, iPhone camera hardware and actual GPU rendering remain physical-device checks.
+Tests exercise real RTCDataChannels across isolated browser contexts, with a deterministic Nostr-compatible WebSocket relay in CI. Live mode tests the public relays. Separate fresh contexts model Safari PWA storage. Tests assert zero code files in the initial metadata-only receiver, the browser-parsed unique manifest, custom receiver icon retention, and automatic code transfer on first PWA launch from both remote and local sources. Offline tests reload direct app URLs with source closed and connectivity disabled, or shut down the local preview server for WebKit. Native fixtures verify module imports, worker responses, streaming WASM, JSON fetch, IndexedDB, CSS, HTML navigation and isolation. OS-level install UI, iPhone camera hardware and actual GPU rendering remain physical-device checks.

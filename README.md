@@ -8,8 +8,8 @@ Intended Pages URL: **https://willwalshvt.github.io/AppLauncher/**
 
 The fixed-height home screen has three actions:
 
-- **Add an app → From this device:** choose app files or a built folder. Review its name, entry page and icon, then **Add to this device**. No signaling or external file transfer is used.
-- **Add an app → From another device:** scan the sender's QR with the built-in camera scanner, or paste its link. Review the app and choose **Add to this device**.
+- **Add an app → From this device:** choose app files or a built folder. Review its name, entry page and icon, then **Add to this device**. The selected files stay in that source tab until the installed app opens; its new storage receives them automatically.
+- **Add an app → From another device:** scan the sender's QR with the built-in camera scanner, or paste its link. Review its name/icon and choose **Add to this device**. Only metadata is received at this point; the full files transfer after installation.
 - **Share an app:** choose files, review the icon and generate one QR/link. Keep the source page open through the other device's first installed launch.
 - **My apps:** select a cached app to install, run, reshare without selecting its files again, or remove its cached package.
 
@@ -25,20 +25,24 @@ After adding an app, its install screen provides its own name, icon, manifest `i
 launch.html?app=your-app-id
 ```
 
-Use **Share → Add to Home Screen** on iPhone/iPad (enable **Open as Web App** when offered), **File → Add to Dock** in Mac Safari, or the browser's **Install app** control in desktop Chrome/Edge. A native install button appears where the browser supplies an install prompt. Web pages cannot silently install PWAs.
+Use **Share → Add to Home Screen** on iPhone/iPad (enable **Open as Web App** when offered), **File → Add to Dock** in Mac Safari, or the browser's **Install app** control in desktop Chrome/Edge. Clicking **Add to this device** immediately starts the app-specific installation step. A native install prompt is requested automatically when the browser exposes one and the user gesture is still active; otherwise an **Install** button or precise OS instructions are shown. Web pages cannot silently install PWAs or open the iPhone Add to Home Screen sheet programmatically.
 
 The installed icon opens that specific app in a full-size frame, with no launcher navigation. The root AppLauncher URL remains the library. Different IDs create different app installs; reusing an ID updates the package and retains that app's existing data. Native browser installation UI and duplicate-install behavior vary by OS/browser.
 
-### Safari's separate PWA storage: important first launch
+### Install first, transfer on first open
 
-Safari **does not copy IndexedDB, Cache Storage or localStorage into a newly installed web app**. Cookies alone may be copied. There is no static-site API to bypass this. [WebKit explanation](https://webkit.org/blog/14787/webkit-features-in-safari-17-2/).
+Safari does not copy IndexedDB, Cache Storage or localStorage into a newly installed web app. [WebKit explanation](https://webkit.org/blog/14787/webkit-features-in-safari-17-2/). AppLauncher therefore prepares installation **before** sending app files:
 
-AppLauncher handles the two workflows explicitly:
+1. Choose local files, or scan a sender's QR **once** and review its name and icon.
+2. Click **Add to this device**. AppLauncher prepares that app's unique manifest, name, icon and direct launch URL. Confirm **Install / Add to Home Screen** using the browser/OS control.
+3. Open the new app icon. Its temporary installation ticket reconnects to the original source automatically and fetches the pinned package. A receiver-selected icon is included in this package.
+4. Once the new app says **Offline ready**, the source may close. Later launches open the app directly offline.
 
-1. **Received from another device:** the app's install URL retains a temporary, fragment-only bootstrap invitation and the accepted package hash. Open the installed icon once while online, within ten minutes, while the original source page stays open. The installed app receives the same package from that source automatically, without another QR scan. It checks the app ID/hash, saves its own files, and opens the app. The sender supports both the initial receive and this second transfer over the same QR room. Do not close the source after the first saved confirmation.
-2. **Added from local files:** use **Save setup file** on the install screen. Open the installed icon, choose **Choose app files / setup file**, and select that `.applauncher` file (or choose the original files again). This copies files locally with no signaling service, network upload or external transfer. Browsers sharing the original storage need no second import.
+There are no setup-file downloads, repeated file selections, or second QR scans. For a local import, the original browser tab is the source; for a shared app, the original sharing device stays the source. Public signaling is used to connect a fresh PWA storage container even when source and destination are on the same device. Files remain peer-to-peer.
 
-Wait for **Offline ready** on first open before disconnecting. Later launches go straight to the cached app, even if the original invitation expires. If first setup fails or the source closes, the installed app offers file selection and QR/link reconnection. On iPhone a background Safari source tab can be suspended: prefer the original laptop source for first-launch transfer, or use the local setup-file fallback.
+The share QR expires after ten minutes. Clicking Add creates a separate installation session valid for one hour, so the QR may expire while the already prepared app finishes setup. Keep the source page open and online through the first installed launch. If the source temporarily disconnects, the PWA retries automatically using the saved ticket. A phone may suspend its own background Safari source tab: briefly return to that source tab to let it resume; no file upload or QR scan is required. AppLauncher cannot force a suspended iOS tab to run in the background. A source on another device avoids that same-device suspension issue.
+
+Pending install metadata is stored separately from runnable app packages. An incomplete install does not overwrite an existing cached package. Expired or closed source sessions cannot provide files; the UI explains that installation must be prepared again at the source.
 
 Each Safari PWA can have its own storage container. The main library lists packages available in the **current browser/container**; it cannot enumerate another PWA's private storage. Add apps in the main browser library to keep that browser's collection together. Removing a cached app from that library does not remove a separately installed PWA's copy, and vice versa. There is no cloud catalog or background synchronization.
 
@@ -69,11 +73,11 @@ The runtime prefixes ordinary window `localStorage`, `sessionStorage` and Indexe
 - No local server, certificate workaround, account, API key, or paid backend is needed for use.
 - Public Nostr relays through Trystero handle discovery/signaling. Files travel over an encrypted WebRTC data channel; no file-hosting upload or GitHub write occurs when sharing.
 - Both devices need internet for discovery; same Wi-Fi is preferred. No TURN relay is configured, so some restrictive networks/NAT combinations will fail. Public relay availability varies.
-- Invitations use random 192-bit room and password values, expire after ten minutes, and remain valid for first-launch handoff. Keep links private. Credentials are in the URL fragment; fragments are not sent in HTTP requests.
-- Payloads include a SHA-256 integrity check. Receivers explicitly consent to the app before saving; first-launch auto-receive is pinned to the app/hash already accepted.
+- Invitations use random 192-bit room and password values. Share QR invitations expire after ten minutes; per-install tickets expire after one hour. Keep links private. Credentials are in the URL fragment; fragments are not sent in HTTP requests.
+- Payloads include a SHA-256 integrity check. Receivers explicitly consent to the app before saving; first-launch auto-receive is pinned to the app/hash in the prepared installation ticket.
 - Limits: 250 files / 20 MB of file content per package, plus a bounded icon. Hidden files are excluded. ZIP import is not included. A failed transfer leaves the prior package intact.
 - IndexedDB updates replace the package atomically. Browser storage and native app data survive shell cache updates. Cache cleanup removes only old AppLauncher shell caches in this scope.
-- Browser storage can be cleared/evicted, or lost when an app is removed. Persistent storage is requested when available. Keep source files and setup-file backups.
+- Browser storage can be cleared/evicted, or lost when an app is removed. Persistent storage is requested when available. Keep source files as backups.
 
 See [APP_GUIDE.md](APP_GUIDE.md) for app conventions and [ARCHITECTURE.md](ARCHITECTURE.md) for implementation details.
 
@@ -106,4 +110,4 @@ LIVE_SIGNALING=1 TEST_BROWSER=webkit node tests/browser.mjs
 BASE_URL=https://willwalshvt.github.io/AppLauncher/ node tests/browser.mjs
 ```
 
-Browser tests use real RTCDataChannels between separate browser contexts. CI substitutes a Nostr-compatible WebSocket signaling relay; production transport is unchanged. Tests cover local setup-file import into empty storage, a second transfer into an empty PWA context, unique manifests, custom icons, modules, dynamic imports, workers, streaming WASM, native IndexedDB, COOP/COEP, cached resharing and offline launch. Physical iPhone camera permission, OS installation UI and actual GPU rendering still need device verification.
+Browser tests use real RTCDataChannels between separate browser contexts. CI substitutes a Nostr-compatible WebSocket signaling relay; production transport is unchanged. Tests cover metadata-only staging, deferred transfers from both local and remote sources into empty PWA storage, unique manifests, custom icons, modules, dynamic imports, workers, streaming WASM, native IndexedDB, COOP/COEP, cached resharing and offline launch. Physical iPhone camera permission, OS installation UI and actual GPU rendering still need device verification.

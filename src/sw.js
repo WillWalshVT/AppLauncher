@@ -1,4 +1,4 @@
-import {getApp,base} from './store.js';import {APP_ID,mime} from './package.js';import {appManifest} from './manifest.js';
+import {getApp,getInstall,base} from './store.js';import {APP_ID,mime} from './package.js';import {appManifest} from './manifest.js';
 const PREFIX='app-launcher:'+self.registration.scope+':shell:';
 const CACHE=PREFIX+'__VERSION__';const assets='__ASSETS__';
 self.addEventListener('install',e=>e.waitUntil((async()=>{const c=await caches.open(CACHE);await c.addAll(assets.map(a=>new Request(new URL(a,self.registration.scope),{cache:'reload'})));await self.skipWaiting();})()));
@@ -24,12 +24,12 @@ self.addEventListener('fetch',e=>{
  e.respondWith((async()=>{
   if(u.pathname.startsWith(base+'apps/'))return appFile(e.request,u);
   if(u.pathname===base+'app.webmanifest'){
-   const app=await getApp(u.searchParams.get('app'));if(!app)return response('{}','application/manifest+json',404);
+   const app=(await getInstall(u.searchParams.get('app')))||await getApp(u.searchParams.get('app'));if(!app)return response('{}','application/manifest+json',404);
    try{return response(JSON.stringify(appManifest(app,self.registration.scope,u.searchParams.get('start')||undefined)),'application/manifest+json');}catch{return response('{}','application/manifest+json',400);}
   }
-  if(u.pathname===base+'app-icon.png'){const app=await getApp(u.searchParams.get('app'));if(app?.icon){const b=atob(app.icon.split(',')[1]);return response(Uint8Array.from(b,c=>c.charCodeAt(0)),'image/png');}}
+  if(u.pathname===base+'app-icon.png'){const app=(await getInstall(u.searchParams.get('app')))||await getApp(u.searchParams.get('app'));if(app?.icon){const b=atob(app.icon.split(',')[1]);return response(Uint8Array.from(b,c=>c.charCodeAt(0)),'image/png');}}
   const c=await caches.open(CACHE);const key=u.pathname===base||u.pathname===base+'index.html'?self.registration.scope:u.origin+u.pathname;const cached=await c.match(key);
-  if(cached){if(u.pathname===base+'launch.html'){const app=await getApp(u.searchParams.get('app'));if(app?.isolation){const h=new Headers(cached.headers);h.set('Cross-Origin-Opener-Policy','same-origin');h.set('Cross-Origin-Embedder-Policy','require-corp');return new Response(await cached.arrayBuffer(),{headers:h});}}return cached;}
+  if(cached){if(u.pathname===base+'launch.html'){const app=(await getInstall(u.searchParams.get('app')))||await getApp(u.searchParams.get('app'));if(app?.isolation){const h=new Headers(cached.headers);h.set('Cross-Origin-Opener-Policy','same-origin');h.set('Cross-Origin-Embedder-Policy','require-corp');return new Response(await cached.arrayBuffer(),{headers:h});}}return cached;}
   return fetch(e.request);
  })().catch(()=>response('Unable to open this app. Check local storage or reconnect to its source.','text/plain',503)));
 });
