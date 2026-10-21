@@ -4,13 +4,13 @@ const PREFIX='app-launcher:'+self.registration.scope+':shell:';
 const VERSION='__ENGINE_VERSION__';const CACHE=PREFIX+'__VERSION__';const assets='__ASSETS__';
 self.addEventListener('install',e=>e.waitUntil((async()=>{const c=await caches.open(CACHE);await c.addAll(assets.map(a=>new Request(new URL(a,self.registration.scope),{cache:'reload'})));await self.skipWaiting();})()));
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())if(k.startsWith(PREFIX)&&k!==CACHE)await caches.delete(k);await self.clients.claim();})()));
-self.addEventListener('message',e=>{if(e.data?.type==='STATUS')e.waitUntil((async()=>{const c=await caches.open(CACHE);e.ports[0]?.postMessage({version:VERSION,appUpdates:true,ready:(await Promise.all(assets.map(a=>c.match(new URL(a,self.registration.scope).href)))).every(Boolean)});})());});
+self.addEventListener('message',e=>{if(e.data?.type==='STATUS')e.waitUntil((async()=>{const c=await caches.open(CACHE);e.ports[0]?.postMessage({version:VERSION,appUpdates:true,appUpdateVersions:true,ready:(await Promise.all(assets.map(a=>c.match(new URL(a,self.registration.scope).href)))).every(Boolean)});})());});
 const updating=new Set();
 self.addEventListener('message',e=>{if(e.data?.type!=='APP_UPDATE')return;e.waitUntil((async()=>{const port=e.ports[0],id=e.data.id;try{
  const client=e.source&&await self.clients.get(e.source.id);const path=base+'apps/'+id+'/';
  if(!client||!APP_ID.test(id)||new URL(client.url).origin!==self.location.origin||!new URL(client.url).pathname.startsWith(path)||!await getApp(id))throw Error('Update must be requested by the installed app.');
  if(updating.has(id))throw Error('An update is already in progress.');updating.add(id);
- try{const app=await downloadUpdate(e.data.source,id,progress=>port?.postMessage({progress}));await saveApp(app);port?.postMessage({updated:true,version:app.version});}finally{updating.delete(id);}
+ try{const app=await downloadUpdate(e.data.source,id,progress=>port?.postMessage({progress}),fetch,{...await getApp(id),reportedAppVersion:e.data.installedVersion});if(app.upToDate){port?.postMessage(app);}else{await saveApp(app);port?.postMessage({updated:true,version:app.version,appVersion:app.appVersion});}}finally{updating.delete(id);}
  }catch(error){port?.postMessage({error:error.message});}})());});
 const response=(body,type,status=200,headers={})=>new Response(body,{status,headers:{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers}});
 export function sliceRange(data,header){const m=/^bytes=(\d*)-(\d*)$/.exec(header||'');if(!m||(!m[1]&&!m[2]))return null;const start=m[1]?Number(m[1]):Math.max(0,data.byteLength-Number(m[2]));const end=m[1]?(m[2]?Math.min(Number(m[2]),data.byteLength-1):data.byteLength-1):data.byteLength-1;return start<=end&&start<data.byteLength?{start,end}:null;}

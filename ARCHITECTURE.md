@@ -101,3 +101,7 @@ disabled by CSS, and physical Chrome/iOS appearance is not verified by desktop
 WebKit tests. The deprecated Apple status-bar-style key is removed rather than
 used to request translucent or fullscreen status chrome. Viewport listeners and
 the surface are cleaned up when the launcher returns to its own UI.
+
+Installed iOS app containers also reserve a 20 px top-level clearance strip below native chrome. This applies when safe-area env values are zero as well as nonzero; no interactive app content is drawn in that strip. It is a mitigation for system blur, not a claim to disable native overlays. Cleanup removes the clearance on returning to launcher UI.
+
+Hosted releases may carry `appVersion` (major.minor.patch). The updater first compares installed metadata, falling back to the included release.json for packages initially received by QR. Equal/older semantic releases or identical file-list digests return upToDate before any asset fetch. APP_UPDATE persists a newer release version only after integrity checks and atomic save. STATUS advertises appUpdateVersions for clients upgrading legacy engines.

@@ -246,16 +246,16 @@ Publish a `release.json` alongside the app's static files to support updates fro
 an installed app. It has `format: 1`, the existing `id`, `name`, HTML `entry`, PNG
 `icon` path, optional `isolation`, and `files` entries with relative `path`, byte
 `size` and lowercase SHA-256 `sha256`. Its `version` is the SHA-256 of UTF-8
-`JSON.stringify(files)`. Do not list `release.json` itself.
+`JSON.stringify(files)`. Add optional `appVersion: "1.2.3"` (three nonnegative integer components) for human-readable release comparison. Increment it for every published app change. Include the generated `release.json` when sharing your output folder so the first installed copy knows its version, but do not list `release.json` itself in `files`.
 
-Send `{type: 'APP_UPDATE', id, source: 'https://publisher.example/app/'}` to
+Send `{type: 'APP_UPDATE', id, source: 'https://publisher.example/app/', installedVersion: '1.2.3'}` to
 `navigator.serviceWorker.controller` with a MessageChannel port. Replies carry
-`{progress: 'Downloading app… 50%'}`, then `{updated: true, version}` or `{error}`.
-Only a running same-origin `apps/id/` client may update that app. The worker
+`{progress: 'Downloading app… 50%'}`, then `{updated: true, version, appVersion}`, `{upToDate: true, appVersion, availableVersion}`, or `{error}`. When the installed version is equal or newer, only release metadata is fetched: no asset download or package replacement. Older packages without semantic versions use the stored or bundled release digest to recognize identical content.
+The optional `installedVersion` is the app’s compiled release version, used only when its stored/bundled release metadata is absent (for example after resharing a previously updated package). Only a running same-origin `apps/id/` client may update that app. The worker
 verifies every file before an atomic package replacement; saved app data stays
-intact. Reload the app frame on success. Partial/failed deployments leave the old
+intact. Reload the top-level app window after an `updated` reply to activate shared viewport handling too. Do not reload for `upToDate`; display a confirmation instead. Partial/failed deployments leave the old
 package runnable offline. Sources require HTTPS (localhost HTTP is allowed for
-tests). STATUS replies include `appUpdates: true` in supporting engines. Call the
+tests). STATUS replies include `appUpdates: true` and `appUpdateVersions: true` in version-aware engines. Call the
 existing registration's `update()` and wait for that capability on older engines.
 
 The OS owns an already installed Home Screen icon. Updating files cannot force
