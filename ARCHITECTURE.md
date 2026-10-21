@@ -87,3 +87,17 @@ the previous package. Icon normalization now fills the full 512 px square and
 center-crops non-square images; the OS supplies corner masks. Running app frames
 forward their theme to the top-level shell. Installed launch documents use an
 opaque default status bar instead of translucent chrome.
+
+
+## iOS top-edge rendering
+
+`viewport.js` mounts an opaque fixed top-edge surface in the **top-level** running
+app document, where WebKit's scroll-edge handling can detect it. A header inside
+an iframe alone is insufficient. It synchronizes the app theme/color scheme and
+forwards the outer document's four safe-area insets as `--app-safe-area-*` CSS
+properties in the app frame, including on resize/orientation changes. App code
+can use these with `env()` fallbacks. Native browser toolbar effects cannot be
+disabled by CSS, and physical Chrome/iOS appearance is not verified by desktop
+WebKit tests. The deprecated Apple status-bar-style key is removed rather than
+used to request translucent or fullscreen status chrome. Viewport listeners and
+the surface are cleaned up when the launcher returns to its own UI.
