@@ -1,0 +1,11 @@
+// AppLauncher namespaces ordinary window storage by the chosen app ID.
+const KEY='notes-v1',list=document.querySelector('#notes'),status=document.querySelector('#status');
+let notes=[];
+function parse(value){const data=JSON.parse(value);if(!Array.isArray(data)||data.length>1000||data.some(n=>typeof n?.id!=='string'||typeof n?.text!=='string'||n.text.length>2000)||new Set(data.map(n=>n.id)).size!==data.length)throw Error('This is not a valid notes backup.');return data;}
+try{notes=parse(localStorage.getItem(KEY)||'[]');}catch{status.textContent='Could not read saved notes. Import a backup if available.';}
+function draw(){list.replaceChildren();document.querySelector('#empty').hidden=notes.length>0;for(const note of notes){const row=document.createElement('li'),text=document.createElement('p'),remove=document.createElement('button');text.textContent=note.text;remove.textContent='Delete';remove.setAttribute('aria-label','Delete note: '+note.text.slice(0,40));remove.onclick=()=>save(notes.filter(n=>n.id!==note.id));row.append(text,remove);list.append(row);}}
+function save(next){try{localStorage.setItem(KEY,JSON.stringify(next));notes=next;draw();status.textContent='Saved on this device.';return true;}catch{status.textContent='Storage is unavailable or full. Export a backup before closing.';return false;}}
+document.querySelector('#note-form').onsubmit=e=>{e.preventDefault();const input=document.querySelector('#note'),text=input.value.trim();if(!text)return;if(notes.length>=1000){status.textContent='Note limit reached. Export a backup and remove older notes.';return;}if(save([{id:crypto.randomUUID(),text},...notes]))input.value='';};
+document.querySelector('#export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(notes,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='pocket-notes-backup.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);};
+document.querySelector('#import').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>8*1024*1024)throw Error('Backup must be smaller than 8 MB.');const next=parse(await file.text());if(notes.length&&!confirm('Replace current notes with this backup?'))return;save(next);}catch(error){status.textContent=error.message;}finally{e.target.value='';}};
+draw();

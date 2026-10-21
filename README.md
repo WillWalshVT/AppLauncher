@@ -2,7 +2,32 @@
 
 A static, browser-only launcher for locally developed web apps. This repository is independent of [PhoneCalculator](https://github.com/WillWalshVT/PhoneCalculator); no calculator is bundled here.
 
-Intended Pages URL: **https://willwalshvt.github.io/AppLauncher/**
+Live Pages URL: **https://willwalshvt.github.io/AppLauncher/**
+
+## Build an app from an idea
+
+Give ChatGPT/Codex this repository link and your app description. Start with the [complete developer guide](APP_GUIDE.md), [ready-to-paste agent prompt and delivery workflow](AGENT_GUIDE.md), and [working starter app](examples/starter). [AGENTS.md](AGENTS.md) directs coding agents to the implemented contract.
+
+```text
+Build a complete static web app for AppLauncher using
+https://github.com/WillWalshVT/AppLauncher.
+Read AGENT_GUIDE.md and APP_GUIDE.md first.
+My app should: [describe the app].
+Build and test a ready-to-share output folder. If you have browser upload
+access, generate a live QR through AppLauncher and keep the sender open.
+I will scan it and confirm the phone's Home Screen installation.
+```
+
+The supported route is **describe → build → validate → share from laptop → scan → confirm install → open → automatic transfer → offline app**. No per-app hosting is required. Full browser sharing automation depends on the agent's local file-upload/browser access; there is no publishing API or permanent QR service. The guides distinguish those limits from steps that are automatic today.
+
+Preflight the included starter, or your own completed output, with no dependency installation:
+
+```sh
+node scripts/validate-app.mjs examples/starter --id pocket-notes
+node scripts/validate-app.mjs /path/to/your-app/dist --id your-app-id --json
+```
+
+The checker validates static packaging conventions; it does not replace runtime/device tests. For engine development and hosting, use [Develop and publish](#develop-and-publish) below.
 
 ## Use
 
@@ -35,16 +60,16 @@ launch.html?app=your-app-id
 
 Use **Share → Add to Home Screen** on iPhone/iPad (enable **Open as Web App** when offered), **File → Add to Dock** in Mac Safari, or the browser's **Install app** control in desktop Chrome/Edge. Clicking **Add to this device** immediately starts the app-specific installation step. A native install prompt is requested automatically when the browser exposes one and the user gesture is still active; otherwise an **Install** button or precise OS instructions are shown. Web pages cannot silently install PWAs or open the iPhone Add to Home Screen sheet programmatically.
 
-The installed icon opens that specific app in a full-size frame, with no launcher navigation. The root AppLauncher URL remains the library. Different IDs create different app installs; reusing an ID updates the package and retains that app's existing data. Native browser installation UI and duplicate-install behavior vary by OS/browser.
+The installed icon opens that specific app in a full-size frame, with no launcher navigation. The root AppLauncher URL remains the library. Different IDs create different app installs. A same-ID import replaces the package in the receiving storage container while retaining its existing app data; it does not automatically update separately installed PWA containers. Native browser installation UI and duplicate-install behavior vary by OS/browser.
 
 ### Install first, transfer on first open
 
 Safari does not copy IndexedDB, Cache Storage or localStorage into a newly installed web app. [WebKit explanation](https://webkit.org/blog/14787/webkit-features-in-safari-17-2/). AppLauncher therefore prepares installation **before** sending app files:
 
 1. On the laptop, choose **Share an app**, upload files, choose the name/icon/settings, then **Generate QR**. Scan it once with the phone camera; the phone automatically receives the name/icon and opens installation instructions. Local import and the manual receiver remain available.
-2. Click **Add to this device**. AppLauncher prepares that app's unique manifest, name, icon and direct launch URL. Confirm **Install / Add to Home Screen** using the browser/OS control.
+2. AppLauncher automatically prepares the shared app's unique manifest, name, icon and direct launch URL. Confirm **Install / Add to Home Screen** using the browser/OS control. Manual local imports use **Add to this device** first.
 3. Open the new app icon. Its temporary installation ticket reconnects to the original source automatically and fetches the pinned package. A receiver-selected icon is included in this package.
-4. Once the new app says **Offline ready**, the source may close. Later launches open the app directly offline.
+4. Once the laptop confirms saving and the phone opens the intended application, the source may close. Transfer controls disappear; later launches open the app directly offline.
 
 There are no setup-file downloads, repeated file selections, or second QR scans. For a local import, the original browser tab is the source; for a shared app, the original sharing device stays the source. Public signaling is used to connect a fresh PWA storage container even when source and destination are on the same device. Files remain peer-to-peer.
 
