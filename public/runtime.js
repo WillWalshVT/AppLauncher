@@ -1,0 +1,5 @@
+// Compatibility namespacing, not a security boundary: imported apps are trusted code.
+(()=>{const id=new URL(document.currentScript.src).searchParams.get('app');const prefix='app-launcher:'+id+':';
+ for(const kind of ['localStorage','sessionStorage']){try{const native=window[kind],keys=()=>Object.keys(native).filter(k=>k.startsWith(prefix)).map(k=>k.slice(prefix.length));const methods={getItem:k=>native.getItem(prefix+String(k)),setItem:(k,v)=>native.setItem(prefix+String(k),String(v)),removeItem:k=>native.removeItem(prefix+String(k)),clear:()=>keys().forEach(k=>native.removeItem(prefix+k)),key:i=>keys()[i]??null};Object.defineProperty(window,kind,{value:new Proxy(methods,{get:(t,k)=>k==='length'?keys().length:k in t?t[k]:methods.getItem(k),set:(_,k,v)=>{methods.setItem(k,v);return true;},deleteProperty:(_,k)=>{methods.removeItem(k);return true;},ownKeys:keys,getOwnPropertyDescriptor:()=>({enumerable:true,configurable:true})})});}catch{}}
+ const db=indexedDB;const open=db.open.bind(db),remove=db.deleteDatabase.bind(db);db.open=(name,...args)=>open(prefix+name,...args);db.deleteDatabase=name=>remove(prefix+name);
+})();

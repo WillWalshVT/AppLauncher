@@ -1,0 +1,1 @@
+{"id":"./","name":"AppLauncher","short_name":"AppLauncher","start_url":"./","scope":"./","display":"standalone","background_color":"#121617","theme_color":"#121617","icons":[{"src":"./icon.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
