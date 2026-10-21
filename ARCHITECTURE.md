@@ -23,7 +23,7 @@ The UI uses text escaping for package metadata; app scripts never execute during
 
 ## Protocol
 
-The QR holds a random room/password and ten-minute expiry in the fragment. Trystero uses public Nostr relays only for peer discovery / WebRTC SDP. Its encrypted RTCDataChannel sends:
+The QR holds a random room/password and ten-minute expiry in the fragment. Trystero uses three explicit public Nostr relays (`nos.lol`, `bucket.coracle.social`, `relay.primal.net`) in parallel only for peer discovery / WebRTC SDP. Using the same verified set on both devices avoids rotating onto a broken default endpoint. Relay availability is external; a failed endpoint does not block the others. Its encrypted RTCDataChannel sends:
 
 1. `hello`: sender vs receiver role.
 2. `offer`: app ID, name, entry, bounded file/byte count, normalized PNG icon and digest.

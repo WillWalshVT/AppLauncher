@@ -9,7 +9,7 @@ export function connect({invite,role,bundle,onStatus,onOffer,onApp,onProgress,on
  if(invite.expires<=Date.now())throw Error('Invitation expired.');
  let closed=false,remote=null,offered=null,accepted=false;const sending=new Set(),children=new Map(),offeredPeers=new Set();let prepared=false;
  const status=s=>{if(!closed)onStatus?.(s);};
- const room=joinRoom({appId:'willwalshvt-app-launcher-v1',password:invite.secret,relayConfig:{redundancy:3},trickleIce:true},invite.room,{onJoinError:()=>onError?.(Error('Connection failed. Try the same Wi-Fi and a new QR.'))});
+ const room=joinRoom({appId:'willwalshvt-app-launcher-v1',password:invite.secret,relayConfig:{urls:['wss://nos.lol','wss://bucket.coracle.social','wss://relay.primal.net']},trickleIce:true},invite.room,{onJoinError:()=>onError?.(Error('Connection failed. Try the same Wi-Fi and a new QR.'))});
  const hello=room.makeAction('hello'),offer=room.makeAction('offer'),accept=room.makeAction('accept'),payload=room.makeAction('payload'),receipt=room.makeAction('receipt'),prepare=room.makeAction('prepare'),ready=room.makeAction('prepared');
  const send=(action,data,peerId)=>action.send(data,{target:peerId}).catch(e=>{if(!closed)onError?.(e);});
  const sendOffer=peerId=>{if(offeredPeers.has(peerId))return;offeredPeers.add(peerId);return send(offer,appOffer(bundle),peerId);};
