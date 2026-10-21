@@ -52,7 +52,9 @@ The launcher checks for newer releases on startup. It automatically reloads an i
 
 ## Each app installs separately
 
-After receiving shared metadata, the phone navigates to an actual app-specific document. Its initial HTML response contains the app name, Apple Home Screen title, unique manifest URL and icon URL before any JavaScript runs. This avoids installing with the identity of the original AppLauncher document. Its install screen provides its own name, icon, manifest `id`, and direct launch URL:
+After receiving shared metadata, the phone navigates to an actual app-specific document. Its initial HTML response contains the app name, Apple Home Screen title, unique manifest URL and icon URL before any JavaScript runs. This avoids installing with the identity of the original AppLauncher document. The app icon is embedded as a PNG data URL in the initial document’s Apple touch-icon/favicon links and in its manifest. It does not depend on a later service-worker icon fetch by the native installer. The installer decodes the exact image before showing ready instructions, and preparation URLs include an engine revision to avoid reusing a cached failed icon lookup. Safari/iOS 26+ supports embedded interface/Home Screen icons; older iOS versions are not guaranteed a custom icon for locally shared apps. See [WebKit’s Safari 26 release notes](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/#svg-icons).
+
+Its install screen provides its own name, icon, manifest `id`, and direct launch URL:
 
 ```
 launch.html?app=your-app-id

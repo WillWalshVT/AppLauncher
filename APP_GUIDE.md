@@ -81,7 +81,7 @@ For icons, the launcher tries included linked manifest icons, then `apple-touch-
 
 The app ID must match `[a-z0-9][a-z0-9-]{0,47}`. AppLauncher initially derives it from the discovered name. Record the chosen ID in the app's delivery instructions and explicitly set it in **App settings** when necessary. Two different apps need different IDs. The ID influences package identity, install URL and ordinary window-storage namespacing; the display name is not a substitute for it.
 
-For laptop → phone installs, AppLauncher performs a real navigation to an install document whose initial HTML includes that app's name, Apple Home Screen title, unique manifest and icon URLs. Do not implement a separate install prompt, QR protocol or PWA identity inside your app.
+For laptop → phone installs, AppLauncher performs a real navigation to an install document whose initial HTML includes that app's name, Apple Home Screen title, unique manifest and icon URLs. AppLauncher embeds the normalized PNG directly in that initial document and manifest and verifies decoding before showing installation instructions. This prevents a native icon request from depending on page-only virtual routes. Custom locally shared Home Screen icons target Safari/iOS 26+; older versions may fall back to a letter icon. Do not implement a separate install prompt, QR protocol or PWA identity inside your app.
 
 ## 4. Paths, modules and frameworks
 

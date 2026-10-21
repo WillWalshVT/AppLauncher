@@ -2,7 +2,7 @@ import QRCode from 'qrcode';
 import {makePackage,decodePackage,repack,digest,slug,APP_ID} from './package.js';
 import {listApps,getApp,getInstall,stageInstall,saveApp,deleteApp,base} from './store.js';
 import {normalizeIcon,discover} from './icons.js';
-import {appStart,manifestURL,iconURL} from './manifest.js';
+import {appStart,manifestURL,installIconURL} from './manifest.js';
 import {pendingApp} from './install.js';
 const root=new URL(base,location.origin),$=s=>document.querySelector(s),appRoot=$('#app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -69,7 +69,11 @@ async function appDetail(id){const app=(await getApp(id))||await getInstall(id);
 async function runApp(app){transferPending=false;installer=false;wantsInstall=false;await workerReady();if(app.isolation&&!crossOriginIsolated&&!new URLSearchParams(location.search).has('isolated')){location.replace(appStart(root,app.id)+'&run=1&isolated=1');return;}stop();const url=new URL('apps/'+app.id+'/'+app.entry,root),frame=document.createElement('iframe');frame.id='app-frame';frame.className='app-frame';frame.title=app.name;frame.allow='camera; microphone; fullscreen; autoplay; clipboard-read; clipboard-write; web-share';frame.src=url.href;appRoot.innerHTML='';appRoot.className='running';appRoot.append(frame);document.title=app.name;history.replaceState(null,'',appStart(root,app.id)+(installed()?'':'&run=1'));}
 async function setManifest(app,start){
  const manifest=manifestURL(app,root,start);let link=document.querySelector('link[rel=manifest]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=manifest;
- let icon=document.querySelector('link[rel=apple-touch-icon]');if(!icon){icon=document.createElement('link');icon.rel='apple-touch-icon';document.head.append(icon);}icon.href=iconURL(app,root);
+ let icon=document.querySelector('link[rel=apple-touch-icon]');if(!icon){icon=document.createElement('link');icon.rel='apple-touch-icon';document.head.append(icon);}icon.href=installIconURL(app,root);icon.sizes='512x512';
+ let favicon=document.querySelector('link[rel=icon]');if(!favicon){favicon=document.createElement('link');favicon.rel='icon';document.head.append(favicon);}favicon.type='image/png';favicon.sizes='512x512';favicon.href=icon.href;
+ // Decode the exact install icon before telling the user the install is ready.
+ const image=new Image();image.src=icon.href;await deadline(image.decode(),8000,'App icon did not load. Reload the install page to retry.');
+ if(!image.naturalWidth||!image.naturalHeight)throw Error('App icon could not be decoded.');
  document.title=app.name;let title=document.querySelector('meta[name=apple-mobile-web-app-title]');if(!title){title=document.createElement('meta');title.name='apple-mobile-web-app-title';document.head.append(title);}title.content=app.name;
  await deadline(fetch(manifest).then(r=>{if(!r.ok)throw Error('Unable to prepare app installation.');return r.json();}),8000,'Installation metadata stalled. Reload to retry.');
 }
@@ -82,7 +86,7 @@ async function installPage(app,originalInvite){
   sourceConnection=p.connect({invite,role:'send',bundle,allowPrepare:false,onStatus:message,onError:e=>message(e.message,true),onDone:()=>message('App saved in the installed PWA. You can close this source.')});
  }
  if(!invite||invite.expires<=Date.now())throw Error('The source session ended. Return to the original source tab to prepare installation again.');
- const start=new URL(appStart(root,app.id));start.searchParams.set('version',version);start.hash='receive='+btoa(JSON.stringify(invite));
+ const start=new URL(appStart(root,app.id));start.searchParams.set('version',version);start.searchParams.set('install-engine',ENGINE_VERSION.slice(0,12));start.hash='receive='+btoa(JSON.stringify(invite));
  if(app.pending&&document.querySelector('meta[name=app-launcher-identity]')?.content!==app.id){location.replace(start.href);return;}
  history.replaceState(null,'',start.href);await setManifest(app,start.href);
  shell(app.name,`<div class="content install-screen"><div class="app-info"><img class="icon-preview" id="install-icon" src="${esc(app.icon)}" alt="App icon preview"><div class="stack"><h2>${esc(app.name)}</h2><span class="hint">Ready to add to your Home Screen</span></div></div><button id="install-native" class="primary" ${installPrompt?'':'hidden'}>Install ${esc(app.name)}</button><div class="install-help"><p><strong>1.</strong> Tap Safari’s Share button, then <strong>Add to Home Screen</strong>.</p><p><strong>2.</strong> Leave <strong>Open as Web App</strong> on and tap <strong>Add</strong>.</p><p><strong>3.</strong> Open the new <strong>${esc(app.name)}</strong> icon.</p></div><p class="hint">Keep the laptop’s sharing page open. The app will transfer automatically on first launch.</p><a id="start-link" href="${esc(start.href)}" hidden>Open installation</a></div>`);
