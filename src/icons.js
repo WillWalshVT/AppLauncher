@@ -1,6 +1,6 @@
 export async function normalizeIcon(input,name='App'){
  const canvas=document.createElement('canvas');canvas.width=canvas.height=512;const c=canvas.getContext('2d');c.fillStyle='#243832';c.fillRect(0,0,512,512);
- if(input){const url=typeof input==='string'?input:URL.createObjectURL(input);try{const img=new Image();img.src=url;await img.decode();if(!img.width||!img.height)throw Error();const scale=Math.min(440/img.width,440/img.height);c.drawImage(img,(512-img.width*scale)/2,(512-img.height*scale)/2,img.width*scale,img.height*scale);}catch{throw Error('Choose a supported PNG, JPEG, WebP or SVG image.');}finally{if(typeof input!=='string')URL.revokeObjectURL(url);}}
+ if(input){const url=typeof input==='string'?input:URL.createObjectURL(input);try{const img=new Image();img.src=url;await img.decode();if(!img.width||!img.height)throw Error();const scale=Math.max(512/img.width,512/img.height);c.drawImage(img,(512-img.width*scale)/2,(512-img.height*scale)/2,img.width*scale,img.height*scale);}catch{throw Error('Choose a supported PNG, JPEG, WebP or SVG image.');}finally{if(typeof input!=='string')URL.revokeObjectURL(url);}}
  else{c.fillStyle='#c4eddc';c.font='600 210px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText([...name.trim()][0]?.toUpperCase()||'A',256,270);}
  return canvas.toDataURL('image/png');
 }

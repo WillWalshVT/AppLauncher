@@ -74,3 +74,16 @@ The build creates one content-derived engine version for the launcher, worker, s
 `update.html` and `update.js` form an independent recovery path. Old workers do not precache these new paths and therefore fetch them from the network. New workers serve them network-first, with an offline fallback to explain failures. The updater requests uncached release metadata, calls worker registration/update with `updateViaCache:none`, waits for the active controller to report that exact version and a complete shell, then reloads the same scoped URL. All waits are bounded; failures offer Retry and Go back. It never unregisters unrelated service workers, clears site data, removes app databases or touches PhoneCalculator. Only worker activation's existing scoped shell-cache cleanup removes obsolete engine caches.
 
 Regression tests block launcher JavaScript on the shared app's install document and still verify the correct initial title, Apple title, manifest and icon. Update tests deliberately replace the engine with a legacy cache-first worker, preserve a cached app and localStorage sentinel, follow the recovery page, and verify the latest engine, retained data, old shell cleanup and retry UI on failed/offline updates.
+
+## Hosted app release updates
+
+`app-update.js` validates an explicit HTTPS release directory, app identity,
+relative paths, count/size bounds, and the file-list digest. It downloads up to
+six assets concurrently with byte progress and per-file SHA-256 checks. APP_UPDATE
+accepts only a running same-origin `apps/id/` client for that cached app, serializes
+updates per ID, and commits only the fully verified package. App data is untouched.
+No-store fetches avoid stale files; incomplete deployments fail without replacing
+the previous package. Icon normalization now fills the full 512 px square and
+center-crops non-square images; the OS supplies corner masks. Running app frames
+forward their theme to the top-level shell. Installed launch documents use an
+opaque default status bar instead of translucent chrome.

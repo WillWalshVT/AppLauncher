@@ -239,3 +239,24 @@ The **engine** is different. Use **Update AppLauncher** in its footer to load th
 ## 11. If you are developing the engine itself
 
 This is a different task from building an app. See [README.md](README.md#develop-and-publish) for engine dependencies, tests, building and branch-root Pages deployment. Sources live in `src/` and `public/`; published generated assets also live at the repository root. Rebuild/publish those assets when changing the engine. App authors do not need to fork or redeploy AppLauncher to use it.
+
+## Optional hosted app updates
+
+Publish a `release.json` alongside the app's static files to support updates from
+an installed app. It has `format: 1`, the existing `id`, `name`, HTML `entry`, PNG
+`icon` path, optional `isolation`, and `files` entries with relative `path`, byte
+`size` and lowercase SHA-256 `sha256`. Its `version` is the SHA-256 of UTF-8
+`JSON.stringify(files)`. Do not list `release.json` itself.
+
+Send `{type: 'APP_UPDATE', id, source: 'https://publisher.example/app/'}` to
+`navigator.serviceWorker.controller` with a MessageChannel port. Replies carry
+`{progress: 'Downloading app… 50%'}`, then `{updated: true, version}` or `{error}`.
+Only a running same-origin `apps/id/` client may update that app. The worker
+verifies every file before an atomic package replacement; saved app data stays
+intact. Reload the app frame on success. Partial/failed deployments leave the old
+package runnable offline. Sources require HTTPS (localhost HTTP is allowed for
+tests). STATUS replies include `appUpdates: true` in supporting engines. Call the
+existing registration's `update()` and wait for that capability on older engines.
+
+The OS owns an already installed Home Screen icon. Updating files cannot force
+iOS to refresh that icon; reinstalling may be needed after artwork changes.
