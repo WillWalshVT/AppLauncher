@@ -80,3 +80,9 @@ For locally selected files, the current tab is the source. Public signaling lets
 A QR is valid for ten minutes; a prepared installation gets its own one-hour ticket. Once files and shell are cached, the installed icon opens the app directly offline. The browser/OS still requires installation confirmation; pages cannot silently create PWA icons.
 
 The root launcher lists apps stored in the current browser container. It cannot enumerate or synchronize the separate private stores belonging to Safari-installed PWAs. Keep app source files as backups.
+
+### Refreshing AppLauncher
+
+Use **Update AppLauncher** in the launcher footer to load the current engine from GitHub Pages without removing saved apps or data. For an old cached copy without that link, open https://willwalshvt.github.io/AppLauncher/update.html in the same browser. On a failed update, use Retry or Go back. The footer's eight-character version identifies the running engine. Generate a fresh QR after updating a source page.
+
+Shared app installation opens a dedicated document with its own initial name, icon and manifest. Wait for that app's icon and Home Screen instructions before choosing Add to Home Screen. A previously installed incorrect AppLauncher shortcut does not become a different installed app automatically; remove that incorrect shortcut and install the shared app again.

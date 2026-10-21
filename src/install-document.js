@@ -1,0 +1,9 @@
+import {appStart,manifestURL,iconURL} from './manifest.js';
+const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Safari must see this identity in the document response, before any launcher JS runs.
+export function installDocument(html,app,scope,requestURL){
+ const start=new URL(requestURL||appStart(scope,app.id));
+ if(app.pending&&app.bootstrap){start.searchParams.set('version',app.version);start.hash='receive='+btoa(JSON.stringify(app.bootstrap));}
+ const head=`<title>${escape(app.name)}</title><meta name="apple-mobile-web-app-title" content="${escape(app.name)}"><meta name="app-launcher-identity" content="${escape(app.id)}"><link rel="manifest" href="${escape(manifestURL(app,scope,start.href))}"><link rel="apple-touch-icon" href="${escape(iconURL(app,scope))}">`;
+ return html.replace(/<title>[\s\S]*?<\/title>/i,'').replace(/<link\b[^>]*rel=["'](?:manifest|apple-touch-icon)["'][^>]*>/gi,'').replace(/<meta\b[^>]*name=["'](?:apple-mobile-web-app-title|app-launcher-identity)["'][^>]*>/gi,'').replace('</head>',head+'</head>');
+}

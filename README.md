@@ -17,9 +17,17 @@ The document does not scroll. Long file forms and app lists scroll only inside t
 
 Icons are read from an included web manifest, `apple-touch-icon` / favicon link, or `icon.png`. A generated letter icon is used otherwise. **Add new icon** replaces it with an uploaded image. Images are rasterized locally into a 512 px PNG and travel with the package. The receiver can replace an offered icon before adding the app.
 
+## Updating the engine
+
+Choose **Update AppLauncher** in the launcher footer. It fetches the current GitHub Pages release, downloads and activates its engine, verifies the version and offline shell, and reloads the page. The footer shows the running engine version. Cached packages, pending installation tickets, IndexedDB, localStorage and app data are retained; only obsolete launcher shell caches are replaced. Source transfers may need a fresh QR after an explicit reload.
+
+If an older cached engine has no update action, open [the recovery page](https://willwalshvt.github.io/AppLauncher/update.html) once in that browser. It is a separate network-first page that can replace old cache-first workers without clearing browser history or storage. It only manages this project's service worker. Retry and Go back remain available if an update cannot complete.
+
+The launcher checks for newer releases on startup. It automatically reloads an idle launcher when the new worker takes over, but does not interrupt uploads, sharing, transfers or a running app. Those pages can use the update link or load the new engine next time they open. Separately stored installed PWAs check for engine updates in their own browser container when opened.
+
 ## Each app installs separately
 
-After adding an app, its install screen provides its own name, icon, manifest `id`, and direct launch URL:
+After receiving shared metadata, the phone navigates to an actual app-specific document. Its initial HTML response contains the app name, Apple Home Screen title, unique manifest URL and icon URL before any JavaScript runs. This avoids installing with the identity of the original AppLauncher document. Its install screen provides its own name, icon, manifest `id`, and direct launch URL:
 
 ```
 launch.html?app=your-app-id

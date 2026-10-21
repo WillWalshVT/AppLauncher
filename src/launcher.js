@@ -2,11 +2,12 @@ import QRCode from 'qrcode';
 import {makePackage,decodePackage,repack,digest,slug,APP_ID} from './package.js';
 import {listApps,getApp,getInstall,stageInstall,saveApp,deleteApp,base} from './store.js';
 import {normalizeIcon,discover} from './icons.js';
-import {appStart} from './manifest.js';
+import {appStart,manifestURL,iconURL} from './manifest.js';
 import {pendingApp} from './install.js';
 const root=new URL(base,location.origin),$=s=>document.querySelector(s),appRoot=$('#app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const bytes=n=>n<1024?n+' B':n>1048576?(n/1048576).toFixed(1)+' MB':Math.ceil(n/1024)+' KB';
+const ENGINE_VERSION='__ENGINE_VERSION__';let updateAvailable=false;
 let workerPromise;
 let registration,offline=false,connection,stopCamera,selectedFiles=[],draft={},installPrompt,busy=false,selectionGeneration=0,cameraGeneration=0,pairingModule,sourceConnection,wantsInstall=false,installer=false,transferPending=false;
 const pairing=()=>pairingModule ||= import('./pairing.js');
@@ -14,8 +15,8 @@ const message=(text,error=false)=>{const el=$('#message');if(el){el.textContent=
 const guard=fn=>async(...args)=>{try{await fn(...args);}catch(e){message(e.message,true);console.error(e);}};
 function stopScan(){cameraGeneration++;stopCamera?.();stopCamera=null;const v=$('#camera');if(v)v.hidden=true;}
 function stop(){connection?.close();connection=null;sourceConnection?.close();sourceConnection=null;wantsInstall=false;stopScan();}
-function status(){const el=$('#offline');if(el){el.textContent=offline?(transferPending?'Receiving app…':installer?'Installer ready':'Offline ready'):'Preparing offline access…';el.classList.toggle('ready',offline);}}
-function shell(title,body,{back=true}={}){appRoot.className='';appRoot.innerHTML=`<main class="shell"><header class="top">${back?'<button class="ghost" id="back" aria-label="Back">←</button>':''}<h1>${esc(title)}</h1></header><section class="screen">${body}</section><p class="message" id="message" role="status" aria-live="polite"></p><div id="offline" class="status"></div></main>`;status();$('#back')?.addEventListener('click',guard(()=>go('home')));}
+function status(){const el=$('#offline');if(el){el.textContent=offline?(transferPending?'Receiving app…':installer?'Installer ready':'Offline ready'):'Preparing offline access…';el.classList.toggle('ready',offline);if(offline)el.textContent+=' · '+ENGINE_VERSION.slice(0,8);}}
+function shell(title,body,{back=true}={}){appRoot.className='';appRoot.innerHTML=`<main class="shell"><header class="top">${back?'<button class="ghost" id="back" aria-label="Back">←</button>':''}<h1>${esc(title)}</h1></header><section class="screen">${body}</section><p class="message" id="message" role="status" aria-live="polite"></p><footer class="engine-footer"><div id="offline" class="status"></div><a id="engine-update" href="${esc(new URL('update.html',root).href+'#return='+encodeURIComponent(location.href))}" title="Engine ${ENGINE_VERSION.slice(0,8)}">${updateAvailable?'Update available':'Update AppLauncher'}</a></footer></main>`;status();$('#back')?.addEventListener('click',guard(()=>go('home')));}
 const deadline=(promise,ms,label)=>{let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label)),ms);})]).finally(()=>clearTimeout(timer));};
 async function workerReady(){
  if(workerPromise)return workerPromise;
@@ -24,14 +25,14 @@ async function workerReady(){
   registration ||= await navigator.serviceWorker.register(new URL('sw.js',root),{updateViaCache:'none',type:'module'});
   await navigator.serviceWorker.ready;
   if(!navigator.serviceWorker.controller)await new Promise(resolve=>{const check=()=>{if(navigator.serviceWorker.controller){navigator.serviceWorker.removeEventListener('controllerchange',check);resolve();}};navigator.serviceWorker.addEventListener('controllerchange',check);check();});
-  await new Promise((resolve,reject)=>{const channel=new MessageChannel();const timer=setTimeout(()=>{channel.port1.close();reject(Error('Offline setup did not respond. Reload this page to retry.'));},8000);channel.port1.onmessage=e=>{clearTimeout(timer);channel.port1.close();offline=e.data.ready;status();resolve();};navigator.serviceWorker.controller.postMessage({type:'STATUS'},[channel.port2]);});
+  await new Promise((resolve,reject)=>{const channel=new MessageChannel();const timer=setTimeout(()=>{channel.port1.close();reject(Error('Offline setup did not respond. Reload this page to retry.'));},8000);channel.port1.onmessage=e=>{clearTimeout(timer);channel.port1.close();offline=e.data.ready;status();if(e.data.version&&e.data.version!==ENGINE_VERSION&&!connection&&!sourceConnection&&!selectedFiles.length){if(sessionStorage.getItem('engine-reloaded')!==e.data.version){sessionStorage.setItem('engine-reloaded',e.data.version);location.reload();return;}offerUpdate();message('Engine update is incomplete. Tap Update AppLauncher to retry.',true);}resolve();};navigator.serviceWorker.controller.postMessage({type:'STATUS'},[channel.port2]);});
   navigator.storage?.persist?.().catch(()=>{});
  })(),20000,'Offline setup stalled. Reload this page to retry.').catch(e=>{workerPromise=null;throw e;});return workerPromise;
 }
 function progressMarkup(){return '<div id="transfer-progress" hidden><progress id="progress" value="0" max="1" aria-label="App transfer"></progress><div class="row progress-label"><span id="progress-bytes">0 B</span><span id="progress-percent">0%</span></div></div>';}
 function transferProgress(p,total){const box=$('#transfer-progress');if(!box)return;box.hidden=false;const fraction=Math.max(0,Math.min(1,p));$('#progress').value=fraction;$('#progress-bytes').textContent=bytes(Math.round(fraction*total))+' / '+bytes(total);$('#progress-percent').textContent=Math.floor(fraction*100)+'%';}
 async function requestInstall(){if(!installPrompt)return;const prompt=installPrompt;installPrompt=null;await prompt.prompt();await prompt.userChoice;}
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();if(document.querySelector('link[rel=manifest]')?.href.includes('/app.webmanifest?')){installPrompt=e;$('#install-native')?.removeAttribute('hidden');if(wantsInstall&&navigator.userActivation?.isActive)guard(requestInstall)();}});
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();if(document.querySelector('link[rel=manifest]')?.href.includes('/manifest.webmanifest?')){installPrompt=e;$('#install-native')?.removeAttribute('hidden');if(wantsInstall&&navigator.userActivation?.isActive)guard(requestInstall)();}});
 function home(){installer=false;shell('AppLauncher',`<div class="home screen"><button id="add"><span aria-hidden="true">＋</span>Add an app</button><button id="share"><span aria-hidden="true">↗</span>Share an app</button><button id="my-apps"><span aria-hidden="true">▦</span>My apps</button></div>`,{back:false});$('#add').onclick=guard(()=>go('add'));$('#share').onclick=guard(()=>upload('share'));$('#my-apps').onclick=guard(()=>go('apps'));}
 async function go(next){stop();busy=false;selectionGeneration++;if(next==='home')return home();if(next==='add'){shell('Add an app','<div class="choices"><button class="primary" id="from-device">From this device</button><button id="from-other">From another device</button></div>');$('#from-device').onclick=guard(()=>upload('add'));$('#from-other').onclick=guard(()=>receive());}if(next==='apps')await myApps();}
 function upload(mode,setupId){stop();selectedFiles=[];draft={setupId};
@@ -66,7 +67,13 @@ async function startReceive(invite,{automatic=false,prepareAutomatically=false,o
 async function myApps(){const apps=(await listApps()).sort((a,b)=>b.updated-a.updated);shell('My apps',`<div class="content"><div class="cards">${apps.map(a=>`<button class="card" data-id="${esc(a.id)}"><img src="${esc(a.icon)}" alt=""><span class="name">${esc(a.name)}</span><span aria-hidden="true">›</span></button>`).join('')}</div>${!apps.length?'<p class="empty">No apps on this device yet.</p>':''}</div>`);document.querySelectorAll('[data-id]').forEach(el=>el.onclick=guard(()=>appDetail(el.dataset.id)));}
 async function appDetail(id){const app=(await getApp(id))||await getInstall(id);if(!app)throw Error('App not found.');shell(app.name,`<div class="content"><div class="app-info"><img class="icon-preview" src="${esc(app.icon)}" alt="App icon"><div class="stack"><h2>${esc(app.name)}</h2><span class="hint">${app.count||app.files.length} files · ${bytes(app.size)}</span></div></div><div class="choices"><button id="add-cached" class="primary">Add to this device</button><button id="share-cached">Share with another device</button><button id="open-cached">Open app</button></div><button class="ghost" id="remove">Remove cached app</button></div>`);$('#back').onclick=guard(()=>go('apps'));$('#add-cached').onclick=()=>location.href=appStart(root,app.id);$('#open-cached').onclick=()=>location.href=appStart(root,app.id)+'&run=1';$('#share-cached').disabled=app.pending===true;$('#open-cached').disabled=app.pending===true;$('#share-cached').onclick=guard(()=>shareApp(app));$('#remove').onclick=guard(async()=>{if(confirm('Remove '+app.name+' from this library? Installed copies in separate browser storage are unaffected.')){await deleteApp(id);await go('apps');}});}
 async function runApp(app){transferPending=false;installer=false;wantsInstall=false;await workerReady();if(app.isolation&&!crossOriginIsolated&&!new URLSearchParams(location.search).has('isolated')){location.replace(appStart(root,app.id)+'&run=1&isolated=1');return;}stop();const url=new URL('apps/'+app.id+'/'+app.entry,root),frame=document.createElement('iframe');frame.id='app-frame';frame.className='app-frame';frame.title=app.name;frame.allow='camera; microphone; fullscreen; autoplay; clipboard-read; clipboard-write; web-share';frame.src=url.href;appRoot.innerHTML='';appRoot.className='running';appRoot.append(frame);document.title=app.name;history.replaceState(null,'',appStart(root,app.id)+(installed()?'':'&run=1'));}
-async function setManifest(app,start){const manifest=new URL('app.webmanifest',root);manifest.searchParams.set('app',app.id);manifest.searchParams.set('start',start);document.querySelector('link[rel="manifest"]').href=manifest.href;document.querySelector('link[rel="apple-touch-icon"]').href=new URL('app-icon.png?app='+app.id,root).href;document.title=app.name;let title=document.querySelector('meta[name=apple-mobile-web-app-title]');if(!title){title=document.createElement('meta');title.name='apple-mobile-web-app-title';document.head.append(title);}title.content=app.name;await deadline(fetch(manifest).then(r=>{if(!r.ok)throw Error('Unable to prepare app installation.');return r.json();}),8000,'Installation metadata stalled. Reload to retry.');}
+async function setManifest(app,start){
+ const manifest=manifestURL(app,root,start);let link=document.querySelector('link[rel=manifest]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=manifest;
+ let icon=document.querySelector('link[rel=apple-touch-icon]');if(!icon){icon=document.createElement('link');icon.rel='apple-touch-icon';document.head.append(icon);}icon.href=iconURL(app,root);
+ document.title=app.name;let title=document.querySelector('meta[name=apple-mobile-web-app-title]');if(!title){title=document.createElement('meta');title.name='apple-mobile-web-app-title';document.head.append(title);}title.content=app.name;
+ await deadline(fetch(manifest).then(r=>{if(!r.ok)throw Error('Unable to prepare app installation.');return r.json();}),8000,'Installation metadata stalled. Reload to retry.');
+}
+
 const installed=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 async function installPage(app,originalInvite){
  installer=true;wantsInstall=true;await workerReady();let invite=originalInvite||app.bootstrap,version=app.version;
@@ -76,13 +83,14 @@ async function installPage(app,originalInvite){
  }
  if(!invite||invite.expires<=Date.now())throw Error('The source session ended. Return to the original source tab to prepare installation again.');
  const start=new URL(appStart(root,app.id));start.searchParams.set('version',version);start.hash='receive='+btoa(JSON.stringify(invite));
+ if(app.pending&&document.querySelector('meta[name=app-launcher-identity]')?.content!==app.id){location.replace(start.href);return;}
  history.replaceState(null,'',start.href);await setManifest(app,start.href);
  shell(app.name,`<div class="content install-screen"><div class="app-info"><img class="icon-preview" id="install-icon" src="${esc(app.icon)}" alt="App icon preview"><div class="stack"><h2>${esc(app.name)}</h2><span class="hint">Ready to add to your Home Screen</span></div></div><button id="install-native" class="primary" ${installPrompt?'':'hidden'}>Install ${esc(app.name)}</button><div class="install-help"><p><strong>1.</strong> Tap Safari’s Share button, then <strong>Add to Home Screen</strong>.</p><p><strong>2.</strong> Leave <strong>Open as Web App</strong> on and tap <strong>Add</strong>.</p><p><strong>3.</strong> Open the new <strong>${esc(app.name)}</strong> icon.</p></div><p class="hint">Keep the laptop’s sharing page open. The app will transfer automatically on first launch.</p><a id="start-link" href="${esc(start.href)}" hidden>Open installation</a></div>`);
  $('#back').onclick=()=>{stop();location.href=root.href;};$('#install-native').onclick=guard(requestInstall);if(installPrompt&&navigator.userActivation?.isActive)await requestInstall();
 }
 async function launchPage(){
  const params=new URLSearchParams(location.search),id=params.get('app');if(!APP_ID.test(id||''))throw Error('Invalid app link.');
- shell('Opening app','<div class="empty">Preparing app…</div>',{back:false});await workerReady();const savedApp=await getApp(id),stagedApp=await getInstall(id);const app=(installed()||params.get('run')==='1')&&savedApp?savedApp:stagedApp||savedApp;let invite;
+ shell('Opening app','<div class="empty">Preparing app…</div>',{back:false});await workerReady();checkEngine();const savedApp=await getApp(id),stagedApp=await getInstall(id);const app=(installed()||params.get('run')==='1')&&savedApp?savedApp:stagedApp||savedApp;let invite;
  if(app&&!app.pending&&(installed()||params.get('run')==='1')){await setManifest(app,appStart(root,id));return runApp(app);}
  try{if(location.hash.startsWith('#receive=')){const p=await pairing();invite=p.parseInvite(location.hash);}}catch{}
  invite ||= app?.bootstrap;
@@ -100,6 +108,10 @@ async function launchPage(){
  };
  $('#retry-source').onclick=guard(()=>{tries=0;return setup();});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!finished&&Date.now()-lastActivity>25000){tries=0;guard(setup)();}});await setup();
 }
+function offerUpdate(){updateAvailable=true;const link=$('#engine-update');if(link)link.textContent='Update available';}
+let hadController=!!navigator.serviceWorker?.controller;
+navigator.serviceWorker?.addEventListener('controllerchange',()=>{if(!hadController){hadController=true;return;}if(!connection&&!sourceConnection&&!selectedFiles.length&&!$('#app-frame')&&!location.hash.startsWith('#receive=')&&workerPromise)location.reload();else offerUpdate();});
+async function checkEngine(){try{const url=new URL('release.json',root);url.searchParams.set('fresh',Date.now());const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(4000)});if(response.ok&&(await response.json()).version!==ENGINE_VERSION){offerUpdate();await registration?.update();}}catch{}}
 async function openInvitation(){if(!location.hash.startsWith('#receive=')||location.pathname.endsWith('/launch.html'))return;const p=await pairing(),invite=p.parseInvite(location.hash);history.replaceState(null,'',root.href);receive(invite);}
 window.addEventListener('hashchange',guard(openInvitation));
-(async()=>{try{if(location.pathname.endsWith('/launch.html'))await launchPage();else{if(location.hash.startsWith('#receive='))shell('Connect to laptop','<div class="empty">Preparing connection…</div>',{back:false});else home();await workerReady();await openInvitation();}}catch(e){if(!$('#message'))home();message(e.message,true);const state=$('#offline');if(state)state.textContent='Setup unavailable';}})();
+(async()=>{try{if(location.pathname.endsWith('/launch.html'))await launchPage();else{if(location.hash.startsWith('#receive='))shell('Connect to laptop','<div class="empty">Preparing connection…</div>',{back:false});else home();await workerReady();checkEngine();await openInvitation();}}catch(e){if(!$('#message'))home();message(e.message,true);const state=$('#offline');if(state)state.textContent='Setup unavailable';}})();
